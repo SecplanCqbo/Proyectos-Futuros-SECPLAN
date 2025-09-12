@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="stylesheet" href="css/leaflet.css">
+    <link rel="stylesheet" href="css/L.Control.Layers.Tree.css">
+    <link rel="stylesheet" href="css/qgis2web.css">
+    <link rel="stylesheet" href="css/fontawesome-all.min.css">
+    <link rel="stylesheet" href="css/filter.css">
+    <link rel="stylesheet" href="css/nouislider.min.css">
+    <link rel="stylesheet" href="css/leaflet.photon.css">
+    <style>
+        /* Estilos generales del mapa y cuerpo */
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* Panel de texto informativo - Responsive */
+        #texto {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            right: auto;
+            width: 95%;
+            max-width: 400px;
+            padding: 15px;
+            background-color: #ffffff;
+            border: 1px solid #ccc;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            font-size: 16px;
+            z-index: 9999;
+            animation: fadeInUp 1s ease-out;
+            transition: all 0.5s ease-out;
+        }
+        
+        @media (min-width: 768px) {
+            #texto {
+                left: 1%;
+                right: auto;
+                width: 25%;
+                max-width: 400px;
+            }
+        }
+        
+        .hidden {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        /* Botón de cierre para el panel de texto */
+        #cerrarTexto {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: #777;
+        }
+        
+        #cerrarTexto:hover {
+            color: #333;
+        }
+
+        .logo-container {
+            margin-bottom: 0.5rem;
+        }
+
+        #logo {
+            width: 60%;
+            max-width: 80px;
+            height: auto;
+        }
+        
+        /* Estilos del popup - Más compactos */
+        .popup-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: "Segoe UI", sans-serif;
+            font-size: 12px;
+            color: #333;
+        }
+
+        .popup-table th {
+            text-align: left;
+            font-weight: 600;
+            padding: 4px 6px;
+            background-color: #f0f4f8;
+            color: #0078D7;
+            border-bottom: 1px solid #ddd;
+            width: 40%;
+        }
+
+        .popup-table td {
+            padding: 4px 6px;
+            border-bottom: 1px solid #eee;
+            word-break: break-word;
+        }
+
+        /* Estilo para la simbología (control de capas) */
+        .leaflet-control-layers.leaflet-control {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 8px 12px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 13px;
+            color: #333;
+        }
+
+        .leaflet-control-layers-overlays label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .leaflet-control-layers-overlays label img {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        
+        /* Estilos para las tablas dentro de la leyenda */
+        .leaflet-control-layers table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 5px;
+        }
+        
+        .leaflet-control-layers table td {
+            padding: 2px 0;
+            font-size: 12px;
+            vertical-align: middle;
+            border: none;
+        }
+        
+        .leaflet-control-layers table td img {
+            width: 16px;
+            height: 16px;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+
+        .leaflet-control-layers-tree .leaflet-layerstree-header {
+            font-weight: bold;
+            color: #0056b3;
+            margin-top: 5px;
+            padding-bottom: 3px;
+            border-bottom: 1px solid #eee;
+        }
+        /* Corregimos el estilo para el toggle del control de capas */
+        .leaflet-control-layers-toggle {
+            width: 36px;
+            height: 36px;
+            background-position: 50% 50%;
+        }
+        /* Estilo para el panel de filtro flotante */
+        #filterPanel {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            width: 95%;
+            max-width: 280px;
+            background-color: #ffffff;
+            border: 1px solid #ccc;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 999;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 14px;
+            transition: all 0.3s ease-out;
+        }
+        
+        @media (min-width: 768px) {
+            #filterPanel {
+                right: 10px;
+                bottom: 10px;
+                left: auto;
+                top: auto;
+            }
+        }
+
+        #filterPanel.collapsed .filter-content {
+            max-height: 0;
+            padding: 0 15px;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+        }
+
+        #filterPanel.expanded .filter-content {
+            max-height: 300px;
+            padding: 15px;
+            transition: max-height 0.3s ease-in, padding 0.3s ease-in;
+        }
+
+        .filter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background-color: #f8f8f8;
+            border-bottom: 1px solid #eee;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #0078D7;
+        }
+
+        .filter-header button {
+            background: none;
+            border: none;
+            font-size: 1.2em;
+            cursor: pointer;
+            color: #777;
+        }
+
+        .filter-header button:hover {
+            color: #333;
+        }
+
+        /* Estilos específicos para el select del filtro */
+        .filterselect select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .filterlabel {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #555;
+        }
+
+        .filterlabel.clear-filter {
+            cursor: pointer;
+            color: #0078D7;
+            text-decoration: underline;
+            margin-top: 5px;
+            display: block;
+        }
+
+        .filterlabel.clear-filter:hover {
+            color: #0056b3;
+        }
+    </style>
+    <title>Mapa de Proyectos</title>
+</head>
+<body>
+    <div id="map">
+        <div id="texto">
+            <button id="cerrarTexto">✕</button>
+            <div class="logo-container">
+                <a href="http://mapas.municoquimbo.cl/" target="_blank">
+                    <img id="logo" src="images/logo.png" alt="Logo Municipalidad de Coquimbo">
+                </a>
+            </div>
+            <strong>
+                <br>
+                <span style="font-size: 18px;">Iniciativas Futuras SECPLAN</span><br>
+                Ilustre Municipalidad de Coquimbo<br><br>
+            </strong>
+        </div>
+
+        <div id="filterPanel" class="collapsed">
+            <div class="filter-header" id="filterHeader">
+                <span>Filtrar por Estado</span>
+                <button id="toggleFilter">▼</button>
+            </div>
+            <div class="filter-content">
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/qgis2web_expressions.js"></script>
+    <script src="js/leaflet.js"></script>
+    <script src="js/L.Control.Layers.Tree.min.js"></script>
+    <script src="js/leaflet.rotatedMarker.js"></script>
+    <script src="js/leaflet.pattern.js"></script>
+    <script src="js/leaflet-hash.js"></script>
+    <script src="js/Autolinker.min.js"></script>
+    <script src="js/rbush.min.js"></script>
+    <script src="js/labelgun.min.js"></script>
+    <script src="js/labels.js"></script>
+    <script src="js/leaflet.photon.js"></script>
+    <script src="js/tailDT.js"></script>
+    <script src="js/nouislider.min.js"></script>
+    <script src="js/wNumb.js"></script>
+    
+    <script src="data/SECTORESESTADISTICAS_2.js"></script>
+    <script src="data/PROGRAMACIONLICITACIONES_3.js"></script>
+    <script src="data/INICIATIVASFUTURAS_4.js"></script>
+    
+    <script>
+        // Inicialización del mapa
+        var map = L.map('map', {
+            zoomControl: false, maxZoom: 28, minZoom: 1
+        }).fitBounds([[-30.03400879001387, -71.41049402904866], [-29.93440745539181, -71.2275455587961]]);
+        
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/tomchadwin/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
+        var autolinker = new Autolinker({ truncate: { length: 30, location: 'smart' } });
+
+        // Funciones auxiliares para popups
+        function removeEmptyRowsFromPopupContent(content, feature) {
+            var tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            var rows = tempDiv.querySelectorAll('tr');
+            for (var i = 0; i < rows.length; i++) {
+                var td = rows[i].querySelector('td.visible-with-data');
+                var key = td ? td.id : '';
+                if (td && td.classList.contains('visible-with-data') && feature.properties[key] == null) {
+                    rows[i].parentNode.removeChild(rows[i]);
+                }
+            }
+            return tempDiv.innerHTML;
+        }
+
+        function addClassToPopupIfMedia(content, popup) {
+            var tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            if (tempDiv.querySelector('td img')) {
+                popup._contentNode.classList.add('media');
+                setTimeout(function() {
+                    popup.update();
+                }, 10);
+            } else {
+                popup._contentNode.classList.remove('media');
+            }
+        }
+
+        // Controles y capas base
+        var zoomControl = L.control.zoom({
+            position: 'topleft'
+        }).addTo(map);
+
+        var bounds_group = new L.featureGroup([]);
+        function setBounds() {
+            if (bounds_group.getLayers().length) {
+                map.fitBounds(bounds_group.getBounds());
+            }
+        }
+        
+        map.createPane('pane_GoogleSatelite_0');
+        map.getPane('pane_GoogleSatelite_0').style.zIndex = 400;
+        var layer_GoogleSatelite_0 = L.tileLayer('http://www.google.cn/maps/vt?lyrs=s@189&gl=cn&x={x}&y={y}&z={z}', {
+            pane: 'pane_GoogleSatelite_0',
+            opacity: 1.0,
+            attribution: '',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 18
+        });
+        layer_GoogleSatelite_0;
+
+        map.createPane('pane_OpenStreetMap_1');
+        map.getPane('pane_OpenStreetMap_1').style.zIndex = 401;
+        var layer_OpenStreetMap_1 = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            pane: 'pane_OpenStreetMap_1',
+            opacity: 1.0,
+            attribution: '',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 19
+        });
+        layer_OpenStreetMap_1;
+        map.addLayer(layer_OpenStreetMap_1);
+        
+        // Capa SECTORES ESTADISTICAS
+        function pop_SECTORESESTADISTICAS_2(feature, layer) {
+            var popupContent = '<table class="popup-table">\
+                <tr>\
+                    <th scope="row">Zona</th>\
+                    <td>' + (feature.properties['Zona'] !== null ? autolinker.link(String(feature.properties['Zona']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                </tr>\
+            </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+            layer.on('popupopen', function(e) {
+                addClassToPopupIfMedia(content, e.popup);
+            });
+            layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_SECTORESESTADISTICAS_2_0(feature) {
+            switch(String(feature.properties['Zona'])) {
+                case 'CANTERA BAJA':
+                    return {
+                        pane: 'pane_SECTORESESTADISTICAS_2',
+                        opacity: 1,
+                        color: 'rgba(35,35,35,1.0)',
+                        dashArray: '',
+                        lineCap: 'butt',
+                        lineJoin: 'miter',
+                        weight: 1.0,
+                        fill: true,
+                        fillOpacity: 0.5,
+                        fillColor: 'rgba(237,217,42,1.0)',
+                        interactive: true,
+                    }
+                case 'GUANAQUEROS':
+                    return {
+                        pane: 'pane_SECTORESESTADISTICAS_2',
+                        opacity: 1,
+                        color: 'rgba(35,35,35,1.0)',
+                        dashArray: '',
+                        lineCap: 'butt',
+                        lineJoin: 'miter',
+                        weight: 1.0,
+                        fill: true,
+                        fillOpacity: 0.5,
+                        fillColor: 'rgba(156,207,79,1.0)',
+                        interactive: true,
+                    }
+                case 'LA HERRADURA':
+                    return {
+                        pane: 'pane_SECTORESESTADISTICAS_2',
+                        opacity: 1,
+                        color: 'rgba(35,35,35,1.0)',
+                        dashArray: '',
+                        lineCap: 'butt',
+                        lineJoin: 'miter',
+                        weight: 1.0,
+                        fill: true,
+                        fillOpacity: 0.5,
+                        fillColor: 'rgba(238,60,208,1.0)',
+                        interactive: true,
+                    }
+                case 'PARTE ALTA':
+                    return {
+                        pane: 'pane_SECTORESESTADISTICAS_2',
+                        opacity: 1,
+                        color: 'rgba(35,35,35,1.0)',
+                        dashArray: '',
+                        lineCap: 'butt',
+                        lineJoin: 'miter',
+                        weight: 1.0,
+                        fill: true,
+                        fillOpacity: 0.5,
+                        fillColor: 'rgba(28,168,103,1.0)',
+                        interactive: true,
+                    }
+                case 'PEÑUELAS':
+                    return {
+                        pane: 'pane_SECTORESESTADISTICAS_2',
+                        opacity: 1,
+                        color: 'rgba(35,35,35,1.0)',
+                        dashArray: '',
+                        lineCap: 'butt',
+                        lineJoin: 'miter',
+                        weight: 1.0,
+                        fill: true,
+                        fillOpacity: 0.5,
+                        fillColor: 'rgba(15,81,223,1.0)',
+                        interactive: true,
+                    }
+                case 'RINCONADA':
+                    return {
+                        pane: 'pane_SECTORESESTADISTICAS_2',
+                        opacity: 1,
+                        color: 'rgba(35,35,35,1.0)',
+                        dashArray: '',
+                        lineCap: 'butt',
+                        lineJoin: 'miter',
+                        weight: 1.0,
+                        fill: true,
+                        fillOpacity: 0.5,
+                        fillColor: 'rgba(102,127,209,1.0)',
+                        interactive: true,
+                    }
+                case 'RURAL':
+                    return {
+                        pane: 'pane_SECTORESESTADISTICAS_2',
+                        opacity: 1,
+                        color: 'rgba(35,35,35,1.0)',
+                        dashArray: '',
+                        lineCap: 'butt',
+                        lineJoin: 'miter',
+                        weight: 1.0,
+                        fill: true,
+                        fillOpacity: 0.5,
+                        fillColor: 'rgba(128,174,10,1.0)',
+                        interactive: true,
+                    }
+                case 'SAN JUAN':
+                    return {
+                        pane: 'pane_SECTORESESTADISTICAS_2',
+                        opacity: 1,
+                        color: 'rgba(35,35,35,1.0)',
+                        dashArray: '',
+                        lineCap: 'butt',
+                        lineJoin: 'miter',
+                        weight: 1.0,
+                        fill: true,
+                        fillOpacity: 0.5,
+                        fillColor: 'rgba(86,64,159,1.0)',
+                        interactive: true,
+                    }
+                case 'SINDEMPART':
+                    return {
+                        pane: 'pane_SECTORESESTADISTICAS_2',
+                        opacity: 1,
+                        color: 'rgba(35,35,35,1.0)',
+                        dashArray: '',
+                        lineCap: 'butt',
+                        lineJoin: 'miter',
+                        weight: 1.0,
+                        fill: true,
+                        fillOpacity: 0.5,
+                        fillColor: 'rgba(146,162,57,1.0)',
+                        interactive: true,
+                    }
+                case 'TIERRAS BLANCAS':
+                    return {
+                        pane: 'pane_SECTORESESTADISTICAS_2',
+                        opacity: 1,
+                        color: 'rgba(35,35,35,1.0)',
+                        dashArray: '',
+                        lineCap: 'butt',
+                        lineJoin: 'miter',
+                        weight: 1.0,
+                        fill: true,
+                        fillOpacity: 0.5,
+                        fillColor: 'rgba(85,171,158,1.0)',
+                        interactive: true,
+                    }
+                case 'TONGOY':
+                    return {
+                        pane: 'pane_SECTORESESTADISTICAS_2',
+                        opacity: 1,
+                        color: 'rgba(35,35,35,1.0)',
+                        dashArray: '',
+                        lineCap: 'butt',
+                        lineJoin: 'miter',
+                        weight: 1.0,
+                        fill: true,
+                        fillOpacity: 0.5,
+                        fillColor: 'rgba(35,88,213,1.0)',
+                        interactive: true,
+                    }
+            }
+        }
+        map.createPane('pane_SECTORESESTADISTICAS_2');
+        map.getPane('pane_SECTORESESTADISTICAS_2').style.zIndex = 402;
+        map.getPane('pane_SECTORESESTADISTICAS_2').style['mix-blend-mode'] = 'normal';
+        var layer_SECTORESESTADISTICAS_2 = new L.geoJson(json_SECTORESESTADISTICAS_2, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_SECTORESESTADISTICAS_2',
+            layerName: 'layer_SECTORESESTADISTICAS_2',
+            pane: 'pane_SECTORESESTADISTICAS_2',
+            onEachFeature: pop_SECTORESESTADISTICAS_2,
+            style: style_SECTORESESTADISTICAS_2_0,
+        });
+        bounds_group.addLayer(layer_SECTORESESTADISTICAS_2);
+        map.addLayer(layer_SECTORESESTADISTICAS_2);
+        
+        // Capa PROGRAMACION LICITACIONES
+        function pop_PROGRAMACIONLICITACIONES_3(feature, layer) {
+            var popupContent = '<table class="popup-table">\
+                <tr>\
+                    <th scope="row">ID</th>\
+                    <td>' + (feature.properties['ID'] !== null ? autolinker.link(String(feature.properties['ID']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                </tr>\
+                <tr>\
+                    <th scope="row">LICITACION</th>\
+                    <td>' + (feature.properties['LICITACION'] !== null ? autolinker.link(String(feature.properties['LICITACION']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                </tr>\
+                <tr>\
+                    <th scope="row">NOMBRE</th>\
+                    <td>' + (feature.properties['NOMBRE'] !== null ? autolinker.link(String(feature.properties['NOMBRE']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                </tr>\
+            </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+            layer.on('popupopen', function(e) {
+                addClassToPopupIfMedia(content, e.popup);
+            });
+            layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_PROGRAMACIONLICITACIONES_3_0() {
+            return {
+                pane: 'pane_PROGRAMACIONLICITACIONES_3',
+                radius: 4.0,
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(232,113,141,1.0)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_PROGRAMACIONLICITACIONES_3');
+        map.getPane('pane_PROGRAMACIONLICITACIONES_3').style.zIndex = 403;
+        map.getPane('pane_PROGRAMACIONLICITACIONES_3').style['mix-blend-mode'] = 'normal';
+        var layer_PROGRAMACIONLICITACIONES_3 = new L.geoJson(json_PROGRAMACIONLICITACIONES_3, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_PROGRAMACIONLICITACIONES_3',
+            layerName: 'layer_PROGRAMACIONLICITACIONES_3',
+            pane: 'pane_PROGRAMACIONLICITACIONES_3',
+            onEachFeature: pop_PROGRAMACIONLICITACIONES_3,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.circleMarker(latlng, style_PROGRAMACIONLICITACIONES_3_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_PROGRAMACIONLICITACIONES_3);
+        map.addLayer(layer_PROGRAMACIONLICITACIONES_3);
+        
+        // Capa INICIATIVAS FUTURAS
+        function pop_INICIATIVASFUTURAS_4(feature, layer) {
+            var popupContent = '<table class="popup-table">\
+                <tr>\
+                    <th scope="row">INICIATIVA</th>\
+                    <td>' + (feature.properties['INICIATIVA'] !== null ? autolinker.link(String(feature.properties['INICIATIVA']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                </tr>\
+                <tr>\
+                    <th scope="row">LICITACION</th>\
+                    <td>' + (feature.properties['LICITACION'] !== null ? autolinker.link(String(feature.properties['LICITACION']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                </tr>\
+                <tr>\
+                    <th scope="row">ESTADO</th>\
+                    <td>' + (feature.properties['ESTADO'] !== null ? autolinker.link(String(feature.properties['ESTADO']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                </tr>\
+                <tr>\
+                    <th scope="row">NOMBRE</th>\
+                    <td>' + (feature.properties['NOMBRE'] !== null ? autolinker.link(String(feature.properties['NOMBRE']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                </tr>\
+            </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+            layer.on('popupopen', function(e) {
+                addClassToPopupIfMedia(content, e.popup);
+            });
+            layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_INICIATIVASFUTURAS_4_0() {
+            return {
+                pane: 'pane_INICIATIVASFUTURAS_4',
+                radius: 4.0,
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(152,125,183,1.0)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_INICIATIVASFUTURAS_4');
+        map.getPane('pane_INICIATIVASFUTURAS_4').style.zIndex = 404;
+        map.getPane('pane_INICIATIVASFUTURAS_4').style['mix-blend-mode'] = 'normal';
+        var layer_INICIATIVASFUTURAS_4 = new L.geoJson(json_INICIATIVASFUTURAS_4, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_INICIATIVASFUTURAS_4',
+            layerName: 'layer_INICIATIVASFUTURAS_4',
+            pane: 'pane_INICIATIVASFUTURAS_4',
+            onEachFeature: pop_INICIATIVASFUTURAS_4,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.circleMarker(latlng, style_INICIATIVASFUTURAS_4_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_INICIATIVASFUTURAS_4);
+        map.addLayer(layer_INICIATIVASFUTURAS_4);
+        
+        // Control de capas (simbología)
+        var overlaysTree = [
+            {label: '<img src="legend/INICIATIVASFUTURAS_4.png" /> INICIATIVAS FUTURAS', layer: layer_INICIATIVASFUTURAS_4},
+            {label: '<img src="legend/PROGRAMACIONLICITACIONES_3.png" /> PROGRAMACION LICITACIONES', layer: layer_PROGRAMACIONLICITACIONES_3},
+            {label: 'SECTORES ESTADISTICAS<br /><table><tr><td style="text-align: center;"><img src="legend/SECTORESESTADISTICAS_2_CANTERABAJA0.png" /></td><td>CANTERA BAJA</td></tr><tr><td style="text-align: center;"><img src="legend/SECTORESESTADISTICAS_2_GUANAQUEROS1.png" /></td><td>GUANAQUEROS</td></tr><tr><td style="text-align: center;"><img src="legend/SECTORESESTADISTICAS_2_LAHERRADURA2.png" /></td><td>LA HERRADURA</td></tr><tr><td style="text-align: center;"><img src="legend/SECTORESESTADISTICAS_2_PARTEALTA3.png" /></td><td>PARTE ALTA</td></tr><tr><td style="text-align: center;"><img src="legend/SECTORESESTADISTICAS_2_PEÑUELAS4.png" /></td><td>PEÑUELAS</td></tr><tr><td style="text-align: center;"><img src="legend/SECTORESESTADISTICAS_2_RINCONADA5.png" /></td><td>RINCONADA</td></tr><tr><td style="text-align: center;"><img src="legend/SECTORESESTADISTICAS_2_RURAL6.png" /></td><td>RURAL</td></tr><tr><td style="text-align: center;"><img src="legend/SECTORESESTADISTICAS_2_SANJUAN7.png" /></td><td>SAN JUAN</td></tr><tr><td style="text-align: center;"><img src="legend/SECTORESESTADISTICAS_2_SINDEMPART8.png" /></td><td>SINDEMPART</td></tr><tr><td style="text-align: center;"><img src="legend/SECTORESESTADISTICAS_2_TIERRASBLANCAS9.png" /></td><td>TIERRAS BLANCAS</td></tr><tr><td style="text-align: center;"><img src="legend/SECTORESESTADISTICAS_2_TONGOY10.png" /></td><td>TONGOY</td></tr></table>', layer: layer_SECTORESESTADISTICAS_2},
+            {label: "OpenStreetMap", layer: layer_OpenStreetMap_1},
+            {label: "Google Satelite", layer: layer_GoogleSatelite_0},
+        ];
+        var lay = L.control.layers.tree(null, overlaysTree,{
+            collapsed: true, // ⭐ Ahora inicia colapsado para que el botón funcione correctamente
+        }).addTo(map);
+
+        // Lógica para los paneles flotantes (texto y filtro)
+        document.addEventListener("DOMContentLoaded", function() {
+            const cerrarTextoBtn = document.getElementById('cerrarTexto');
+            const textoPanel = document.getElementById('texto');
+            
+            if (cerrarTextoBtn && textoPanel) {
+                cerrarTextoBtn.addEventListener('click', () => {
+                    textoPanel.classList.add('hidden');
+                    setTimeout(() => {
+                        textoPanel.style.display = 'none';
+                    }, 500);
+                });
+            }
+
+            const filterPanel = document.getElementById('filterPanel');
+            const filterHeader = document.getElementById('filterHeader');
+            const toggleFilterBtn = document.getElementById('toggleFilter');
+            const filterContent = filterPanel.querySelector('.filter-content');
+
+            var div_ESTADO = document.createElement('div');
+            div_ESTADO.id = "div_ESTADO";
+            div_ESTADO.className= "filterselect";
+            filterContent.appendChild(div_ESTADO);
+            
+            var lab_ESTADO = document.createElement('div');
+            lab_ESTADO.innerHTML = 'ESTADO';
+            lab_ESTADO.className = 'filterlabel';
+            div_ESTADO.appendChild(lab_ESTADO);
+
+            sel_ESTADO = document.createElement('select');
+            sel_ESTADO.multiple = true;
+            sel_ESTADO.size = 4;
+            sel_ESTADO.id = "sel_ESTADO";
+            var ESTADO_options_str = "<option value='' unselected></option>";
+            sel_ESTADO.onchange = function(){filterFunc()};
+            ESTADO_options_str += '<option value="APERTURADAS Y EN EVALUACION">APERTURADAS Y EN EVALUACION</option>';
+            ESTADO_options_str += '<option value="EN LICITACION A LA FECHA">EN LICITACION A LA FECHA</option>';
+            ESTADO_options_str += '<option value="EVALUADAS PARA ADJUDICAR">EVALUADAS PARA ADJUDICAR</option>';
+            ESTADO_options_str += '<option value="INICIATIVA ACTUAL">INICIATIVA ACTUAL</option>';
+            sel_ESTADO.innerHTML = ESTADO_options_str;
+            div_ESTADO.appendChild(sel_ESTADO);
+            
+            var reset_ESTADO = document.createElement('div');
+            reset_ESTADO.innerHTML = 'Limpiar filtro';
+            reset_ESTADO.className = 'filterlabel clear-filter';
+            reset_ESTADO.onclick = function() {
+                var options = document.getElementById("sel_ESTADO").options;
+                for (var i=0; i < options.length; i++) {
+                    options[i].selected = false;
+                }
+                filterFunc();
+            };
+            div_ESTADO.appendChild(reset_ESTADO);
+
+            if (filterHeader) {
+                filterHeader.addEventListener('click', () => {
+                    filterPanel.classList.toggle('collapsed');
+                    filterPanel.classList.toggle('expanded');
+                    toggleFilterBtn.textContent = filterPanel.classList.contains('expanded') ? '▲' : '▼';
+                });
+            }
+
+            filterPanel.classList.add('collapsed');
+            if(toggleFilterBtn) toggleFilterBtn.textContent = '▼';
+
+            setBounds();
+        });
+
+        // Función principal de filtrado
+        var Filters = {"ESTADO": "str"};
+        function filterFunc() {
+            map.eachLayer(function(lyr){
+                if ("options" in lyr && "dataVar" in lyr["options"]){
+                    let features = this[lyr["options"]["dataVar"]].features.slice(0);
+                    try{
+                        for (let key in Filters){
+                            let keyS = key.replace(/[^a-zA-Z0-9_]/g, "")
+                            if (Filters[key] === "str" || Filters[key] === "bool"){
+                                let selection = [];
+                                let options = document.getElementById("sel_" + keyS).options
+                                for (let i=0; i < options.length; i++) {
+                                    if (options[i].selected) selection.push(options[i].value);
+                                }
+                                try{
+                                    if (key in features[0].properties){
+                                        for (let i = features.length - 1; i >= 0; --i){
+                                            if (selection.indexOf(features[i].properties[key])<0 && selection.length>0) {
+                                                features.splice(i,1);
+                                            }
+                                        }
+                                    }
+                                } catch(err){
+                                }
+                            }
+                            if (Filters[key] === "int"){
+                                let sliderVals = document.getElementById("div_" + keyS).noUiSlider.get();
+                                try{
+                                    if (key in features[0].properties){
+                                        for (let i = features.length - 1; i >= 0; --i){
+                                            if (parseInt(features[i].properties[key]) < sliderVals[0] || parseInt(features[i].properties[key]) > sliderVals[1]){
+                                                features.splice(i,1);
+                                            }
+                                        }
+                                    }
+                                } catch(err){ }
+                            }
+                            if (Filters[key] === "real"){
+                                let sliderVals = document.getElementById("div_" + keyS).noUiSlider.get();
+                                try{
+                                    if (key in features[0].properties){
+                                        for (let i = features.length - 1; i >= 0; --i){
+                                            if (features[i].properties[key] < sliderVals[0] || features[i].properties[key] > sliderVals[1]){
+                                                features.splice(i,1);
+                                            }
+                                        }
+                                    }
+                                } catch(err){ }
+                            }
+                            if (Filters[key] === "date" || Filters[key] === "datetime" || Filters[key] === "time"){
+                                try{
+                                    if (key in features[0].properties){
+                                        let HTMLkey = key.replace(/[&\/\\#,+()$~%.'":*?<>{} ]/g, '');
+                                        let startdate = document.getElementById("dat_" + HTMLkey + "_date1").value.replace(" ", "T");
+                                        let enddate = document.getElementById("dat_" + HTMLkey + "_date2").value.replace(" ", "T");
+                                        for (let i = features.length - 1; i >= 0; --i){
+                                            if (features[i].properties[key] < startdate || features[i].properties[key] > enddate){
+                                                features.splice(i,1);
+                                            }
+                                        }
+                                    }
+                                } catch(err){ }
+                            }
+                        }
+                    } catch(err){
+                    }
+                this[lyr["options"]["layerName"]].clearLayers();
+                this[lyr["options"]["layerName"]].addData(features);
+                }
+            }.bind(this));
+        }
+    </script>
+</body>
+</html>
